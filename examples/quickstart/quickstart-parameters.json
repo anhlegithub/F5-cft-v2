@@ -1,0 +1,126 @@
+[
+  {
+    "ParameterKey": "allowUsageAnalytics",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "appContainerName",
+    "ParameterValue": "f5devcentral/f5-demo-app:latest"
+  },
+  {
+    "ParameterKey": "application",
+    "ParameterValue": "f5app"
+  },
+  {
+    "ParameterKey": "artifactLocation",
+    "ParameterValue": "f5-aws-cloudformation-v2/v3.4.0.0/examples/"
+  },
+  {
+    "ParameterKey": "bigIpHostname",
+    "ParameterValue": "bigip01.local"
+  },
+  {
+    "ParameterKey": "bigIpLicenseKey",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "bigIpRuntimeInitConfig",
+    "ParameterValue": "https://f5-cft-v2.s3.amazonaws.com/f5-aws-cloudformation-v2/v3.4.0.0/examples/quickstart/bigip-configurations/runtime-init-conf-3nic-payg-with-app.yaml"
+  },
+  {
+    "ParameterKey": "bigIpRuntimeInitPackageUrl",
+    "ParameterValue": "https://cdn.f5.com/product/cloudsolutions/f5-bigip-runtime-init/v2.0.1/dist/f5-bigip-runtime-init-2.0.1-1.gz.run"
+  },
+  {
+    "ParameterKey": "bigIpSecretArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "cost",
+    "ParameterValue": "f5costcenter"
+  },
+  {
+    "ParameterKey": "bigIpCustomImageId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "environment",
+    "ParameterValue": "f5env"
+  },
+  {
+    "ParameterKey": "group",
+    "ParameterValue": "f5group"
+  },
+  {
+    "ParameterKey": "bigIpImage",
+    "ParameterValue": "Best"
+  },
+  {
+    "ParameterKey": "bigIpInstanceProfile",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "bigIpInstanceType",
+    "ParameterValue": "m5.2xlarge"
+  },
+  {
+    "ParameterKey": "licenseType",
+    "ParameterValue": "payg"
+  },
+  {
+    "ParameterKey": "numAzs",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "numNics",
+    "ParameterValue": "3"
+  },
+  {
+    "ParameterKey": "numSubnets",
+    "ParameterValue": "4"
+  },
+  {
+    "ParameterKey": "owner",
+    "ParameterValue": "f5owner"
+  },
+  {
+    "ParameterKey": "provisionPublicIp",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "provisionSecret",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "restrictedSrcAddressApp",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "restrictedSrcAddressMgmt",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "s3BucketName",
+    "ParameterValue": "f5-cft-v2"
+  },
+  {
+    "ParameterKey": "s3BucketRegion",
+    "ParameterValue": "us-east-1"
+  },
+  {
+    "ParameterKey": "sshKey",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "throughput",
+    "ParameterValue": "25Mbps"
+  },
+  {
+    "ParameterKey": "uniqueString",
+    "ParameterValue": "myuniqstr"
+  },
+  {
+    "ParameterKey": "version",
+    "ParameterValue": "17-1-1-026"
+  }
+]

@@ -1,0 +1,146 @@
+[
+  {
+    "ParameterKey": "allowUsageAnalytics",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "application",
+    "ParameterValue": "f5app"
+  },
+  {
+    "ParameterKey": "instanceProfile",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "bigIpPeerAddr",
+    "ParameterValue": "10.0.1.11"
+  },
+  {
+    "ParameterKey": "bigIpPeerHostname",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "bigIpRuntimeInitConfig",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "bigIpRuntimeInitPackageUrl",
+    "ParameterValue": "https://cdn.f5.com/product/cloudsolutions/f5-bigip-runtime-init/v2.0.1/dist/f5-bigip-runtime-init-2.0.1-1.gz.run"
+  },
+  {
+    "ParameterKey": "cfeS3Bucket",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "cfeTag",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "cost",
+    "ParameterValue": "f5cost"
+  },
+  {
+    "ParameterKey": "environment",
+    "ParameterValue": "f5env"
+  },
+  {
+    "ParameterKey": "externalSelfPublicIpId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "externalServicePublicIpIds",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "externalSecurityGroupId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "externalSelfIp",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "externalServiceIps",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "externalSubnetId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "group",
+    "ParameterValue": "f5group"
+  },
+  {
+    "ParameterKey": "hostname",
+    "ParameterValue": "bigip01.local"
+  },
+  {
+    "ParameterKey": "imageId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "instanceIndex",
+    "ParameterValue": "01"
+  },
+  {
+    "ParameterKey": "instanceType",
+    "ParameterValue": "m5.2xlarge"
+  },
+  {
+    "ParameterKey": "internalSecurityGroupId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "internalSelfIp",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "internalSubnetId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "licenseKey",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "mgmtPublicIpId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "mgmtSecurityGroupId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "mgmtAddress",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "mgmtSubnetId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "numExternalPublicIpAddresses",
+    "ParameterValue": "2"
+  },
+  {
+    "ParameterKey": "numSecondaryPrivateIpAddresses",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "owner",
+    "ParameterValue": "f5owner"
+  },
+  {
+    "ParameterKey": "secretArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "sshKey",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "uniqueString",
+    "ParameterValue": "myuniqstr"
+  }
+]

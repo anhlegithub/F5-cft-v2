@@ -1,0 +1,1100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  This template creates a BIG-IP Standalone WAF solution. The template uses nested
+  templates for provisioning compute resources for hosting a BIG-IP Standalone solution.
+Conditions:
+  1nic: !Equals
+    - 1
+    - !Ref 'numNics'
+  2nic: !Or
+    - !Condition '3nic'
+    - !Equals
+      - 2
+      - !Ref 'numNics'
+  3nic: !Equals
+    - 3
+    - !Ref 'numNics'
+  2nicPublic: !And
+    - !Condition '2nic'
+    - !Condition 'publicIp'
+  1nicPublic: !And
+    - !Condition '1nic'
+    - !Condition 'publicIp'
+  1nicPrivate: !And
+    - !Condition '1nic'
+    - !Condition 'noPublicIp'
+  not1nicPrivate: !Not
+    - !Condition '1nicPrivate'
+  noPublicIp: !Equals
+    - 'false'
+    - !Ref 'provisionPublicIp'
+  publicIp: !Equals
+    - 'true'
+    - !Ref 'provisionPublicIp'
+  isPaygLicensing: !Equals
+    - payg
+    - !Ref 'licenseType'
+  noCustomImageId: !Equals
+    - ''
+    - !Ref 'bigIpCustomImageId'
+  useBigIpInstanceProfile: !Not
+    - !Equals
+      - !Ref 'bigIpInstanceProfile'
+      - ""
+  createKeyPair: !Equals
+    - ''
+    - !Ref 'sshKey'
+  createSecret: !And
+    - !Equals
+      - !Ref 'provisionSecret'
+      - 'true'
+    - !Equals
+      - ''
+      - !Ref 'bigIpSecretArn'
+  useSecretArn: !Not
+    - !Equals
+      - ''
+      - !Ref 'bigIpSecretArn'
+  useSecret: !Or
+    - !Condition 'createSecret'
+    - !Condition 'useSecretArn'
+  useAccess: !Or
+    - !Condition 'createKeyPair'
+    - !Condition 'useSecret'
+Mappings:
+  AWSBigipThroughput:
+    1000Mbps:
+      AdvancedWaf: AdvancedWaf1000Mbps
+      Best: Best1000Mbps
+      PerAppVeAwaf: PerAppVeAwaf1000Mbps
+    200Mbps:
+      AdvancedWaf: AdvancedWaf200Mbps
+      Best: Best200Mbps
+      PerAppVeAwaf: PerAppVeAwaf200Mbps
+    25Mbps:
+      AdvancedWaf: AdvancedWaf25Mbps
+      Best: Best25Mbps
+      PerAppVeAwaf: PerAppVeAwaf25Mbps
+    5000Mbps:
+      Best: Best5000Mbps
+    10000Mbps:
+      Best: Best10000Mbps
+  VERSION:
+    17-1-1-026:
+      REGIONMAP: TMOS1711026
+    16-1-4-1-0535:
+      REGIONMAP: TMOS161440535
+  TMOS1711026:
+    af-south-1:
+      AdvancedWaf200Mbps: ami-0be65a722af2ceeb8
+      AdvancedWaf25Mbps: ami-09883534856120d03
+      AdvancedWaf3000Mbps: ami-024467f34a80213ec
+      AllTwoBootLocations: ami-0c3763e49f0b139e8
+      Best10000Mbps: ami-0e66b79b7d06cd33a
+      Best1000Mbps: ami-0f1ad36742d15e9cc
+      Best200Mbps: ami-059c86b4152df2e6f
+      Best25Mbps: ami-05804ab193c80cbc0
+      Best5000Mbps: ami-0b8ce703da30249d4
+    ap-east-1:
+      AdvancedWaf200Mbps: ami-010163be5114afe3a
+      AdvancedWaf25Mbps: ami-0a0e986b1bd65e6f0
+      AdvancedWaf3000Mbps: ami-00b70bcab088b471a
+      AllTwoBootLocations: ami-001ee6e05d83e3e51
+      Best10000Mbps: ami-045826308c707a9db
+      Best1000Mbps: ami-0bd8d7c1c65439429
+      Best200Mbps: ami-098371051fc9f898b
+      Best25Mbps: ami-09d49dcf3cb0c5880
+      Best5000Mbps: ami-0bd5e0afae9fb4c64
+    ap-northeast-1:
+      AdvancedWaf200Mbps: ami-0fcf23eaf5d399dd8
+      AdvancedWaf25Mbps: ami-0c47d493c39ed3760
+      AdvancedWaf3000Mbps: ami-091b0c07cbbf1a1f9
+      AllTwoBootLocations: ami-02e4e1a8646018052
+      Best10000Mbps: ami-04d177b430409a7cc
+      Best1000Mbps: ami-042a158c53a8a62d2
+      Best200Mbps: ami-039c4c57105314f64
+      Best25Mbps: ami-0fda4b1fea13823b6
+      Best5000Mbps: ami-0f40a13f8069e23a7
+    ap-northeast-2:
+      AdvancedWaf200Mbps: ami-0f9530aacc6fcd2ef
+      AdvancedWaf25Mbps: ami-0a82e8caaaa06be55
+      AdvancedWaf3000Mbps: ami-07e343672906fcc54
+      AllTwoBootLocations: ami-0c59b992749071ab5
+      Best10000Mbps: ami-0eda364580b4eac65
+      Best1000Mbps: ami-02533899b1c5b67ff
+      Best200Mbps: ami-0f0b1d284fe47c076
+      Best25Mbps: ami-0b90e0d46de7b43e6
+      Best5000Mbps: ami-0f850280ffdb3fb0d
+    ap-northeast-3:
+      AdvancedWaf200Mbps: ami-090a61c8b7f9ad6b6
+      AdvancedWaf25Mbps: ami-0e826ae7aa32022cc
+      AdvancedWaf3000Mbps: ami-0cd1b4dea8be9887a
+      AllTwoBootLocations: ami-02d9ea860a0c7eeb7
+      Best10000Mbps: ami-0e4c1e8006b4a8177
+      Best1000Mbps: ami-02f100a9b855cdd04
+      Best200Mbps: ami-0858706049a53a501
+      Best25Mbps: ami-0f7338927d6789642
+      Best5000Mbps: ami-08d516db7f75e631a
+    ap-south-1:
+      AdvancedWaf200Mbps: ami-0c4b1227000c1e031
+      AdvancedWaf25Mbps: ami-049fc54063497f5e6
+      AdvancedWaf3000Mbps: ami-0defeb160596ffa7a
+      AllTwoBootLocations: ami-081c5d3dd5503c432
+      Best10000Mbps: ami-07c1e9180a8d7ff55
+      Best1000Mbps: ami-0b15a63e920175bf0
+      Best200Mbps: ami-0d77a91d05a42b6d0
+      Best25Mbps: ami-0e78645f2e3d41735
+      Best5000Mbps: ami-065f169a7b22f3fdc
+    ap-southeast-1:
+      AdvancedWaf200Mbps: ami-0bf4d136a73eb34e2
+      AdvancedWaf25Mbps: ami-09b5bbef1b4c02073
+      AdvancedWaf3000Mbps: ami-0951fa86bb3543a14
+      AllTwoBootLocations: ami-09a5f901fbfb2d971
+      Best10000Mbps: ami-05326d0ba4539c22f
+      Best1000Mbps: ami-06bfdca39caa9059e
+      Best200Mbps: ami-0b34d3f7428d565b5
+      Best25Mbps: ami-0b851f57e68a14db0
+      Best5000Mbps: ami-0d009969baedf885c
+    ap-southeast-2:
+      AdvancedWaf200Mbps: ami-0ce2ae444bc217179
+      AdvancedWaf25Mbps: ami-0694d2149ceb1ef23
+      AdvancedWaf3000Mbps: ami-0d969b850f2ae58a3
+      AllTwoBootLocations: ami-00309bb415a04820e
+      Best10000Mbps: ami-02828b6e4785331ee
+      Best1000Mbps: ami-0ddfa0a0e65c6dca3
+      Best200Mbps: ami-03fbe7dd4b39f5bc4
+      Best25Mbps: ami-0a2734f05dc835bb7
+      Best5000Mbps: ami-0d35a1f2b6353b6f9
+    ca-central-1:
+      AdvancedWaf200Mbps: ami-0ae5cd89abd49ba79
+      AdvancedWaf25Mbps: ami-0d96f1ef5b0016ea6
+      AdvancedWaf3000Mbps: ami-06f1341beae883040
+      AllTwoBootLocations: ami-088ac15138a11956f
+      Best10000Mbps: ami-0d7ac938813722f64
+      Best1000Mbps: ami-09c54ee2e3078920c
+      Best200Mbps: ami-0a8da953aa88b85b1
+      Best25Mbps: ami-0ba85d4c46409ffa2
+      Best5000Mbps: ami-0f4a6409afe15b305
+    eu-central-1:
+      AdvancedWaf200Mbps: ami-0cd45f012f408d907
+      AdvancedWaf25Mbps: ami-0e3b820726b9b7547
+      AdvancedWaf3000Mbps: ami-0c18c6a81aa22cf26
+      AllTwoBootLocations: ami-0b6f43ccd46952865
+      Best10000Mbps: ami-00171e53d9c32c823
+      Best1000Mbps: ami-0a9cda328fad639d1
+      Best200Mbps: ami-0b315e92566a2f67b
+      Best25Mbps: ami-020a026a5959b4f64
+      Best5000Mbps: ami-09b6e061acb7b6681
+    eu-north-1:
+      AdvancedWaf200Mbps: ami-08d1b25238491a0f9
+      AdvancedWaf25Mbps: ami-0d5a5c77a377e908d
+      AdvancedWaf3000Mbps: ami-0e610915012be9248
+      AllTwoBootLocations: ami-01f381855ffe45331
+      Best10000Mbps: ami-0aa59a6114b607b52
+      Best1000Mbps: ami-04d8546e5d1f3e063
+      Best200Mbps: ami-0f9161be5676d8e9b
+      Best25Mbps: ami-0b91e10c8161f8098
+      Best5000Mbps: ami-0734ae6fba17039a1
+    eu-south-1:
+      AdvancedWaf200Mbps: ami-0659796b109744c50
+      AdvancedWaf25Mbps: ami-0ce1028aea4c911a1
+      AdvancedWaf3000Mbps: ami-06d6c2fbf212c60ef
+      AllTwoBootLocations: ami-061bcdab9215accdd
+      Best10000Mbps: ami-0a9813caf60f0b4c7
+      Best1000Mbps: ami-0affa0f1a28992997
+      Best200Mbps: ami-0441372b9115122d6
+      Best25Mbps: ami-098e121a6a6efc99f
+      Best5000Mbps: ami-0216adfd5f6a4254b
+    eu-west-1:
+      AdvancedWaf200Mbps: ami-0551a51b199b5de82
+      AdvancedWaf25Mbps: ami-0c49aab522c168837
+      AdvancedWaf3000Mbps: ami-04d58b62aa9bf73b2
+      AllTwoBootLocations: ami-0b8377ba34550d082
+      Best10000Mbps: ami-0e965b8161d586165
+      Best1000Mbps: ami-07ca25de11d0065ec
+      Best200Mbps: ami-010e9a99e74e58704
+      Best25Mbps: ami-07bf43ab874190567
+      Best5000Mbps: ami-05e75ed42766c9426
+    eu-west-2:
+      AdvancedWaf200Mbps: ami-0800bb44ba57517d0
+      AdvancedWaf25Mbps: ami-08a35ba5dd4fab7bb
+      AdvancedWaf3000Mbps: ami-0b9c6fdd93665ccdd
+      AllTwoBootLocations: ami-00f526b1d42006bfa
+      Best10000Mbps: ami-0503e5c02885c5b19
+      Best1000Mbps: ami-086409856eaedb533
+      Best200Mbps: ami-0b95959b72666ef2d
+      Best25Mbps: ami-02147d61c4bc6c77c
+      Best5000Mbps: ami-09e486ab22cecf60a
+    eu-west-3:
+      AdvancedWaf200Mbps: ami-0e8c36b9806609f1f
+      AdvancedWaf25Mbps: ami-0b2e1e11b4b30a3d8
+      AdvancedWaf3000Mbps: ami-0e34dd98961b7aea2
+      AllTwoBootLocations: ami-0388d52313e6cad44
+      Best10000Mbps: ami-09a7a22733fa7d92b
+      Best1000Mbps: ami-04c4fe73f6c06a02d
+      Best200Mbps: ami-0ddd201299d692212
+      Best25Mbps: ami-0a7c9d5fc5ee117d9
+      Best5000Mbps: ami-015d92b3e04adbadb
+    me-south-1:
+      AdvancedWaf200Mbps: ami-046370773a46b2d60
+      AdvancedWaf25Mbps: ami-0e6cb771b5f535710
+      AdvancedWaf3000Mbps: ami-0db46a668681f8b19
+      AllTwoBootLocations: ami-00ebb6ca9bc90e696
+      Best10000Mbps: ami-03f86078daebb20fa
+      Best1000Mbps: ami-0024bce1b7ac01975
+      Best200Mbps: ami-0c0528b4fd8d0b3ee
+      Best25Mbps: ami-09f398d8e8afc75e5
+      Best5000Mbps: ami-0cd43b29ec9fe4307
+    sa-east-1:
+      AdvancedWaf200Mbps: ami-08048f80c49aa9081
+      AdvancedWaf25Mbps: ami-0b14fa24f8084f68f
+      AdvancedWaf3000Mbps: ami-025c3e5b46fbf7c39
+      AllTwoBootLocations: ami-02f712adc014786c7
+      Best10000Mbps: ami-08b1ef5b2de404319
+      Best1000Mbps: ami-0cb1b792878457b79
+      Best200Mbps: ami-0029784545478de53
+      Best25Mbps: ami-0efe71c4132e1a3fe
+      Best5000Mbps: ami-0c9637e95c3199a28
+    us-east-1:
+      AdvancedWaf200Mbps: ami-07ee55eae25efee54
+      AdvancedWaf25Mbps: ami-07ec9601ad832280d
+      AdvancedWaf3000Mbps: ami-058bd0181f6648170
+      AllTwoBootLocations: ami-0d31d197395c83e61
+      Best10000Mbps: ami-00ab6b7f3705d48c8
+      Best1000Mbps: ami-0753c8640fec81fbe
+      Best200Mbps: ami-0c264f0d32f15b118
+      Best25Mbps: ami-0c5d796e0753476b2
+      Best5000Mbps: ami-06ac31d38815424ee
+    us-east-2:
+      AdvancedWaf200Mbps: ami-0658d157471e9c24a
+      AdvancedWaf25Mbps: ami-06703ce66e890f8c7
+      AdvancedWaf3000Mbps: ami-0203a61ba7e8a0f0d
+      AllTwoBootLocations: ami-0358f3b9dc92ee58c
+      Best10000Mbps: ami-07399dfa5eb63db7b
+      Best1000Mbps: ami-001f9583fbf8976d0
+      Best200Mbps: ami-09262ed4519d09204
+      Best25Mbps: ami-01622de4dedecb649
+      Best5000Mbps: ami-09debf8ff39f1d0f8
+    us-gov-east-1:
+      AdvancedWaf200Mbps: ami-0ca7a743e1e9291fe
+      AdvancedWaf25Mbps: ami-0b1aaed98754bed79
+      AdvancedWaf3000Mbps: ami-019007320bf6443d2
+      AllTwoBootLocations: ami-0ce41178f8977fdcd
+      Best10000Mbps: ami-0a947400997049877
+      Best1000Mbps: ami-03784c3f16556c46f
+      Best200Mbps: ami-0950b9845cb395de6
+      Best25Mbps: ami-03b30ad318939d483
+      Best5000Mbps: ami-070414e813165fa31
+    us-gov-west-1:
+      AdvancedWaf200Mbps: ami-09134ce2671ea8e8a
+      AdvancedWaf25Mbps: ami-0830e2d50dbbe0985
+      AdvancedWaf3000Mbps: ami-08a2a3025dd895d51
+      AllTwoBootLocations: ami-09101d663e7607abe
+      Best10000Mbps: ami-079295b2b8984567b
+      Best1000Mbps: ami-04fab18d7cc5ee936
+      Best200Mbps: ami-0193ffd9287c2b033
+      Best25Mbps: ami-0fbe7b3edbcc66edf
+      Best5000Mbps: ami-08c0b26128d103ca1
+    us-west-1:
+      AdvancedWaf200Mbps: ami-024619b8886c8f5ec
+      AdvancedWaf25Mbps: ami-09b50abb14b7a706d
+      AdvancedWaf3000Mbps: ami-02a3eec3ae517de4c
+      AllTwoBootLocations: ami-0ccbf7ea8b590405c
+      Best10000Mbps: ami-0767ff1728420218e
+      Best1000Mbps: ami-0936fd27a8167d8a2
+      Best200Mbps: ami-04cb0918d5b8102a9
+      Best25Mbps: ami-028cbb082e63ec515
+      Best5000Mbps: ami-0a231cc66ef9858b0
+    us-west-2:
+      AdvancedWaf200Mbps: ami-0da2c5f7eac210efd
+      AdvancedWaf25Mbps: ami-032f7048af64a1e90
+      AdvancedWaf3000Mbps: ami-0e84e1f07b2885ec7
+      AllTwoBootLocations: ami-0e1baff14b669262c
+      Best10000Mbps: ami-075ab2cff0b2de996
+      Best1000Mbps: ami-07bde69c76cf2d171
+      Best200Mbps: ami-0af29214281b7a799
+      Best25Mbps: ami-069720f0fd8e8890c
+      Best5000Mbps: ami-0c5bba6660b8388f3
+  TMOS161440535:
+    af-south-1:
+      AdvancedWaf200Mbps: ami-012af84e11140ecab
+      AdvancedWaf25Mbps: ami-090f17d1e52857a6a
+      AdvancedWaf3000Mbps: ami-0fcc74421e8cfecf0
+      AllTwoBootLocations: ami-03355359202a3d2ff
+      Best10000Mbps: ami-03142fad995db9c38
+      Best1000Mbps: ami-01b2000af822417ae
+      Best200Mbps: ami-04a3c9c4f16aed4fc
+      Best25Mbps: ami-0d8b4a5ab549ccdbd
+      Best5000Mbps: ami-0b4f0f8fc1f59ecbb
+    ap-east-1:
+      AdvancedWaf200Mbps: ami-03734a39571ec07b0
+      AdvancedWaf25Mbps: ami-03decbbba4d277e5b
+      AdvancedWaf3000Mbps: ami-0ffd1a42c3d91fe36
+      AllTwoBootLocations: ami-080f699000ba28564
+      Best10000Mbps: ami-0ceb02a419f7ce688
+      Best1000Mbps: ami-0036392a0bbeaf65e
+      Best200Mbps: ami-088949790bed486d6
+      Best25Mbps: ami-044bad157c9812fca
+      Best5000Mbps: ami-023b604061702bfc6
+    ap-northeast-1:
+      AdvancedWaf200Mbps: ami-07849d6cd2949a59f
+      AdvancedWaf25Mbps: ami-03f8926dad011fbc2
+      AdvancedWaf3000Mbps: ami-0d06488548768dd72
+      AllTwoBootLocations: ami-0ed2ae263adc52ced
+      Best10000Mbps: ami-07736ecd44f1d50d7
+      Best1000Mbps: ami-04199c7cbbea2c3a7
+      Best200Mbps: ami-0dbd7000db1a6c77a
+      Best25Mbps: ami-02d19c7ab15ac04ab
+      Best5000Mbps: ami-096eeac0c269e908a
+    ap-northeast-2:
+      AdvancedWaf200Mbps: ami-0d25f56c9d65875f6
+      AdvancedWaf25Mbps: ami-056aa74a85ac28803
+      AdvancedWaf3000Mbps: ami-0a875d5811aa73593
+      AllTwoBootLocations: ami-0beaaeb363b04a884
+      Best10000Mbps: ami-0e963e51e2cd46daa
+      Best1000Mbps: ami-0f716140a6b2f36e6
+      Best200Mbps: ami-0c2be85f98d4fefbf
+      Best25Mbps: ami-047e862ef21a0bdd0
+      Best5000Mbps: ami-08d87349b125b677d
+    ap-northeast-3:
+      AdvancedWaf200Mbps: ami-0f24afd7cba86a358
+      AdvancedWaf25Mbps: ami-00263717c4c5d9fd8
+      AdvancedWaf3000Mbps: ami-0684fd14bc8c03070
+      AllTwoBootLocations: ami-0762ce989c94fa8c1
+      Best10000Mbps: ami-0486a351db89f95a6
+      Best1000Mbps: ami-0dab584a429398084
+      Best200Mbps: ami-0425a1ee2cbfad890
+      Best25Mbps: ami-0bb3d1f122290cefa
+      Best5000Mbps: ami-056511e22e15fbedd
+    ap-south-1:
+      AdvancedWaf200Mbps: ami-02285ccbe1ed2764b
+      AdvancedWaf25Mbps: ami-0b5e773aa3fe6db3d
+      AdvancedWaf3000Mbps: ami-091ffe10535782917
+      AllTwoBootLocations: ami-0feae4e9f9de3c0e7
+      Best10000Mbps: ami-0c41bb16f6dfd1527
+      Best1000Mbps: ami-042acb423285afe8b
+      Best200Mbps: ami-0fba04cc797e37888
+      Best25Mbps: ami-04267a7dea66cbc34
+      Best5000Mbps: ami-0ff70d89ad607d2d1
+    ap-southeast-1:
+      AdvancedWaf200Mbps: ami-0d231328960feef8d
+      AdvancedWaf25Mbps: ami-09a910c02526e2d3f
+      AdvancedWaf3000Mbps: ami-01d56cf7757ce89b7
+      AllTwoBootLocations: ami-09d2c3d9773de2db7
+      Best10000Mbps: ami-0489e16a0399d74c7
+      Best1000Mbps: ami-0497b2699c3c1aed2
+      Best200Mbps: ami-09f2db86d9b585078
+      Best25Mbps: ami-07ee971581b04e973
+      Best5000Mbps: ami-086211a3075253489
+    ap-southeast-2:
+      AdvancedWaf200Mbps: ami-0c454936ac77506b2
+      AdvancedWaf25Mbps: ami-059165e3917907952
+      AdvancedWaf3000Mbps: ami-04a91816e69459929
+      AllTwoBootLocations: ami-0e4bfcd862ac342c4
+      Best10000Mbps: ami-0c00e5fd0b03d261f
+      Best1000Mbps: ami-07fe8fd74e74eb7d0
+      Best200Mbps: ami-0e547fc48dca00d37
+      Best25Mbps: ami-0e35bd70cc71bf444
+      Best5000Mbps: ami-0faa61e054bf8efd7
+    ca-central-1:
+      AdvancedWaf200Mbps: ami-010e481f49c615cbe
+      AdvancedWaf25Mbps: ami-00771ea36be60b5c7
+      AdvancedWaf3000Mbps: ami-08f589c4595d2f1cf
+      AllTwoBootLocations: ami-0ee38d7f85c219a3e
+      Best10000Mbps: ami-0c4d12f3f1bf710df
+      Best1000Mbps: ami-011a7ec80070c0f19
+      Best200Mbps: ami-00c49acb6192aa9f0
+      Best25Mbps: ami-054b67e5b6506981a
+      Best5000Mbps: ami-07ee3e6ef5045df9a
+    eu-central-1:
+      AdvancedWaf200Mbps: ami-0a7b4a05e4dab976b
+      AdvancedWaf25Mbps: ami-0ec48bfb082b26f56
+      AdvancedWaf3000Mbps: ami-0c939392ce7bb9ca6
+      AllTwoBootLocations: ami-0a8de2b4dcd4094ff
+      Best10000Mbps: ami-09ed4d8afe61cff9b
+      Best1000Mbps: ami-049c10e9ba930da0a
+      Best200Mbps: ami-00a7a91cee424fcbb
+      Best25Mbps: ami-0013f6b5a258d7ee3
+      Best5000Mbps: ami-0fadb40d2fa9bc345
+    eu-north-1:
+      AdvancedWaf200Mbps: ami-07ac515b07290bfb4
+      AdvancedWaf25Mbps: ami-0e1c043b75fb55281
+      AdvancedWaf3000Mbps: ami-0f4f5d79a576ea785
+      AllTwoBootLocations: ami-09a60cfc21a2ecc0e
+      Best10000Mbps: ami-0c0720e97029d0595
+      Best1000Mbps: ami-00da1677d1da69667
+      Best200Mbps: ami-0ae15c53db0728075
+      Best25Mbps: ami-02f648e96fbff839f
+      Best5000Mbps: ami-09314dcfc8e60cf4a
+    eu-south-1:
+      AdvancedWaf200Mbps: ami-0b378324bcffc7d81
+      AdvancedWaf25Mbps: ami-034db211b3ced4320
+      AdvancedWaf3000Mbps: ami-03759a041f536f0e7
+      AllTwoBootLocations: ami-0cc7868b5434aa9c9
+      Best10000Mbps: ami-0a7a9a4b188ffeaad
+      Best1000Mbps: ami-06a8267b0421bbf4a
+      Best200Mbps: ami-01e0c85bd19836ea5
+      Best25Mbps: ami-0c5e551b882ce03d4
+      Best5000Mbps: ami-09878b9cd691be213
+    eu-west-1:
+      AdvancedWaf200Mbps: ami-0df742d79f1e23937
+      AdvancedWaf25Mbps: ami-0179990050f53d86d
+      AdvancedWaf3000Mbps: ami-0a7d2ba8e9049df43
+      AllTwoBootLocations: ami-06952f9b2ebe39c8b
+      Best10000Mbps: ami-0cb60795246a20c22
+      Best1000Mbps: ami-09b4bc76ddf41557e
+      Best200Mbps: ami-0c837979984adb752
+      Best25Mbps: ami-075b739e0301cb641
+      Best5000Mbps: ami-0073c474c95c5eb47
+    eu-west-2:
+      AdvancedWaf200Mbps: ami-0c3185a52412724e7
+      AdvancedWaf25Mbps: ami-020c9bde44f9d5a08
+      AdvancedWaf3000Mbps: ami-01c96af279e321602
+      AllTwoBootLocations: ami-072c56fe21200550f
+      Best10000Mbps: ami-0d62246cbc6fc09a3
+      Best1000Mbps: ami-081b96d29e0739402
+      Best200Mbps: ami-0cdc51b643e538e30
+      Best25Mbps: ami-04417b42950cd2365
+      Best5000Mbps: ami-0730305e8cb1d96c0
+    eu-west-3:
+      AdvancedWaf200Mbps: ami-03f0a9fd1819d9384
+      AdvancedWaf25Mbps: ami-010d4ec48ee23c887
+      AdvancedWaf3000Mbps: ami-076545c738d487617
+      AllTwoBootLocations: ami-0d46522ba069d2d2d
+      Best10000Mbps: ami-06ca53099b383818d
+      Best1000Mbps: ami-0011b613f10699670
+      Best200Mbps: ami-06dbbc0a00c264666
+      Best25Mbps: ami-074f134bbcf072de9
+      Best5000Mbps: ami-0667b168cb4218388
+    me-south-1:
+      AdvancedWaf200Mbps: ami-05801570b02898905
+      AdvancedWaf25Mbps: ami-04e3a76c9ee9c6ec5
+      AdvancedWaf3000Mbps: ami-0e48d28f65c761e7f
+      AllTwoBootLocations: ami-0687b5592c73bc50e
+      Best10000Mbps: ami-08043df118cf17e06
+      Best1000Mbps: ami-0dd9e30dbf95529df
+      Best200Mbps: ami-0d7f27fc29139b2e0
+      Best25Mbps: ami-0579677aaae7c7bdb
+      Best5000Mbps: ami-0805f232b2e71ad18
+    sa-east-1:
+      AdvancedWaf200Mbps: ami-0065fe106c6c6c7e1
+      AdvancedWaf25Mbps: ami-0c551e2e010674d8f
+      AdvancedWaf3000Mbps: ami-071f88e15c8a48f6a
+      AllTwoBootLocations: ami-0a13bc5838bba284b
+      Best10000Mbps: ami-07c92a9ce02946aad
+      Best1000Mbps: ami-0ee35794bf5f35a5d
+      Best200Mbps: ami-04cf8919c18acb1cd
+      Best25Mbps: ami-04923d4a0ac193c8d
+      Best5000Mbps: ami-0b6bb0f920117287d
+    us-east-1:
+      AdvancedWaf200Mbps: ami-083cc9a56681a9ad6
+      AdvancedWaf25Mbps: ami-0009189c8b7204eb8
+      AdvancedWaf3000Mbps: ami-0faf4c36d4224f788
+      AllTwoBootLocations: ami-046cc6c6fe1c4868d
+      Best10000Mbps: ami-06c3f75e1a7877194
+      Best1000Mbps: ami-0768391ca2b30505d
+      Best200Mbps: ami-00389f4c48d410c63
+      Best25Mbps: ami-0e73be2d1c886368f
+      Best5000Mbps: ami-0819a62499a49710c
+    us-east-2:
+      AdvancedWaf200Mbps: ami-0291281cab026a6d9
+      AdvancedWaf25Mbps: ami-0fda42ccf046ef323
+      AdvancedWaf3000Mbps: ami-0e204db40975ec2a2
+      AllTwoBootLocations: ami-0fd3f2f2a8ecf37a5
+      Best10000Mbps: ami-0358cfe64a5da3c7c
+      Best1000Mbps: ami-0d12258d971c77b14
+      Best200Mbps: ami-0fc9c3203d2fae274
+      Best25Mbps: ami-074b7ad96b6feb999
+      Best5000Mbps: ami-0b27ece27746a666b
+    us-gov-east-1:
+      AdvancedWaf200Mbps: ami-0004603b42a1d265c
+      AdvancedWaf25Mbps: ami-091986ff1bbf2a3a0
+      AdvancedWaf3000Mbps: ami-0584b658ba04290ce
+      AllTwoBootLocations: ami-0a814cc2eb416df93
+      Best10000Mbps: ami-04dc75e366f43febd
+      Best1000Mbps: ami-0b50daba7d46d9d0f
+      Best200Mbps: ami-04d2405ed1d7b3e74
+      Best25Mbps: ami-00e9386d94debfb22
+      Best5000Mbps: ami-008449596309c8a08
+    us-gov-west-1:
+      AdvancedWaf200Mbps: ami-01601b1036dedfcef
+      AdvancedWaf25Mbps: ami-0ba329ae49ab8ebb1
+      AdvancedWaf3000Mbps: ami-02c0213c93504f9ed
+      AllTwoBootLocations: ami-0ec6dc07c282d3de2
+      Best10000Mbps: ami-0d07d28f563558162
+      Best1000Mbps: ami-0fd45b44369ee5786
+      Best200Mbps: ami-0b0e4bcc341c58760
+      Best25Mbps: ami-073a20260f95725a1
+      Best5000Mbps: ami-030a3108b62a1ddd3
+    us-west-1:
+      AdvancedWaf200Mbps: ami-0392458ef64cbb92b
+      AdvancedWaf25Mbps: ami-05ba7ab3a63f5d808
+      AdvancedWaf3000Mbps: ami-0dc763a3fd3dd7b9c
+      AllTwoBootLocations: ami-041c3b45963c481b1
+      Best10000Mbps: ami-0a4fae21aa8a96670
+      Best1000Mbps: ami-0797bb423be4c99de
+      Best200Mbps: ami-0adeca12d6290a717
+      Best25Mbps: ami-0d2712be6f20dd64f
+      Best5000Mbps: ami-04a3c8dea10c42f6f
+    us-west-2:
+      AdvancedWaf200Mbps: ami-02ae9282ec3367c1a
+      AdvancedWaf25Mbps: ami-0d83c6e4063a1ffb7
+      AdvancedWaf3000Mbps: ami-0a431b56a9becaeda
+      AllTwoBootLocations: ami-07e9d2edf0659a17e
+      Best10000Mbps: ami-05d385d49bab5d366
+      Best1000Mbps: ami-005245abba6e3b52a
+      Best200Mbps: ami-0fdba3d5b2546340f
+      Best25Mbps: ami-0c0285f0990bb65ba
+      Best5000Mbps: ami-02831911edf600134
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Templates Location
+        Parameters:
+          - s3BucketRegion
+          - s3BucketName
+          - artifactLocation
+      - Label:
+          default: Network Configuration
+        Parameters:
+          - vpcId
+          - vpcCidr
+          - bigIpMgmtSubnetId
+          - bigIpMgmtAddress
+          - bigIpExternalSubnetId
+          - bigIpExternalSelfIp
+          - bigIpExternalServiceIps
+          - bigIpInternalSubnetId
+          - bigIpInternalSelfIp
+          - numExternalPublicIpAddresses
+          - numSecondaryPrivateIpAddresses
+          - networkBorderGroup
+      - Label:
+          default: Amazon EC2 Configuration
+        Parameters:
+          - sshKey
+          - restrictedSrcAddressMgmt
+          - restrictedSrcAddressApp
+          - bigIpInstanceProfile
+      - Label:
+          default: BIG-IP Configuration
+        Parameters:
+          - version
+          - licenseType
+          - bigIpImage
+          - throughput
+          - bigIpCustomImageId
+          - bigIpInstanceType
+          - numNics
+          - bigIpRuntimeInitConfig
+          - bigIpRuntimeInitPackageUrl
+          - bigIpHostname
+          - bigIpLicenseKey
+          - provisionPublicIp
+          - provisionSecret
+          - bigIpSecretArn
+          - allowUsageAnalytics
+      - Label:
+          default: Resources Tags
+        Parameters:
+          - uniqueString
+          - application
+          - cost
+          - environment
+          - group
+          - owner
+    ParameterLabels:
+      allowUsageAnalytics:
+        default: Send anonymous statistics to F5
+      application:
+        default: Application
+      artifactLocation:
+        default: Directory Path
+      bigIpCustomImageId:
+        default: Custom Image Id
+      bigIpHostname:
+        default: Hostname for BIG-IP instance
+      bigIpImage:
+        default: F5 BIG-IP Performance Type (PAYG Only)
+      bigIpInstanceProfile:
+        default: Instance profile
+      bigIpInstanceType:
+        default: Instance Type
+      bigIpExternalSelfIp:
+        default: BIGIP external interface Self IP
+      bigIpExternalServiceIps:
+        default: Secondary Private IPs (virtual services) on the external interface
+      bigIpExternalSubnetId:
+        default: BIGIP external interface Subnet ID
+      bigIpInternalSelfIp:
+        default: BIGIP internal interface Self IP
+      bigIpInternalSubnetId:
+        default: BIGIP internal interface Subnet ID
+      bigIpLicenseKey:
+        default: License key for BIG-IP instance
+      bigIpMgmtAddress:
+        default: BIGIP management interface IP address
+      bigIpMgmtSubnetId:
+        default: BIGIP management interface Subnet ID
+      bigIpRuntimeInitConfig:
+        default: BIG-IP Runtime Init Config
+      bigIpRuntimeInitPackageUrl:
+        default: Runtime Init Package
+      bigIpSecretArn:
+        default: ARN of Secrets Manager secret
+      cost:
+        default: Cost Center
+      provisionSecret:
+        default: Creates Secrets Manager secret for BIG-IP password
+      environment:
+        default: Environment
+      group:
+        default: Group
+      licenseType:
+        default: License Type
+      networkBorderGroup:
+        default: Name of the network border group for the local zone.
+      numNics:
+        default: Interfaces
+      numExternalPublicIpAddresses:
+        default: Total number of Public IP addresses for the Self-IP and virtual services
+          on the external interface
+      numSecondaryPrivateIpAddresses:
+        default: Number of Secondary Private IPs for virtual services on the external
+          interface
+      owner:
+        default: Owner
+      provisionPublicIp:
+        default: Provision Public IP addresses for the BIG-IP management interface
+      restrictedSrcAddressApp:
+        default: Restricted source address to application
+      restrictedSrcAddressMgmt:
+        default: Restricted source address to BIG-IP
+      s3BucketName:
+        default: S3 Bucket
+      s3BucketRegion:
+        default: S3 Bucket Region
+      sshKey:
+        default: SSH public key
+      throughput:
+        default: BIG-IP VE throughput (PAYG Only)
+      uniqueString:
+        default: Unique String
+      version:
+        default: BIG-IP Version
+      vpcCidr:
+        default: VPC CIDR
+      vpcId:
+        default: VPC ID
+  Version: 3.4.0.0
+Outputs:
+  bigIpInstanceId:
+    Description: bigip's instance-id
+    Value: !GetAtt [BigipStandalone, Outputs.bigIpInstanceId]
+  bigIpKeyPairName:
+    Condition: createKeyPair
+    Description: SSH key pair name
+    Value: !GetAtt [Access, Outputs.keyPairName]
+  bigIpManagementPrivateIp:
+    Description: bigip's private management address
+    Value: !GetAtt [BigipStandalone, Outputs.bigIpManagementInterfacePrivateIp]
+  bigIpManagementPublicIp:
+    Condition: publicIp
+    Description: bigip's public management address. WARNING - For eval purposes only.
+      Production should never have the management interface exposed to Internet
+    Value: !GetAtt [Dag, Outputs.bigIpManagementEipAddress01]
+  bigIpManagementSsh:
+    Condition: publicIp
+    Description: ssh login to bigip's management address. WARNING - For eval purposes
+      only. Production should never have the management interface exposed to Internet
+    Value: !Join
+      - ''
+      - - 'ssh admin@'
+        - !GetAtt [Dag, Outputs.bigIpManagementEipAddress01]
+  bigIpManagementUrl443:
+    Condition: 2nicPublic
+    Description: url to bigip's management address. WARNING - For eval purposes only.
+      Production should never have the management interface exposed to Internet
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !GetAtt [Dag, Outputs.bigIpManagementEipAddress01]
+  bigIpManagementUrl8443:
+    Condition: 1nicPublic
+    Description: url to bigip's management address. WARNING - For eval purposes only.
+      Production should never have the management interface exposed to Internet
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !GetAtt [Dag, Outputs.bigIpManagementEipAddress01]
+        - ':8443'
+  bigIpSecretArn:
+    Condition: createSecret
+    Description: Secret ARN
+    Value: !GetAtt [Access, Outputs.secretArn]
+  vipPublicUrl:
+    Condition: not1nicPrivate
+    Description: url to public vip address
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !GetAtt [Dag, Outputs.bigIpExternalEipAddress02]
+  vipPrivateUrl:
+    Condition: 1nicPrivate
+    Description: url to private vip address
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !Ref 'bigIpExternalServiceIps'
+Parameters:
+  allowUsageAnalytics:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'true'
+    Description: This deployment can send anonymous statistics to F5 to help us determine
+      how to improve our solutions. If you select **false** statistics are not sent.
+    Type: String
+  application:
+    Default: f5app
+    Description: Application Tag.
+    Type: String
+  artifactLocation:
+    AllowedPattern: ^.*[0-9a-zA-Z]+/$
+    ConstraintDescription: 'key prefix can include numbers, lowercase letters, uppercase
+      letters, hyphens (-), and forward slash (/).'
+    Default: f5-aws-cloudformation-v2/v3.4.0.0/examples/
+    Description: 'The path in the S3Bucket where the modules folder is located. Can
+      include numbers, lowercase letters, uppercase letters, hyphens (-), and forward
+      slash (/).'
+    Type: String
+  bigIpExternalSelfIp:
+    AllowedPattern: '^$|^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$'
+    Default: 10.0.0.11
+    Description: External Private IP Address for BIGIP instance. The address must
+      reside in the subnet provided in the bigIpExternalSubnetId parameter. Leave
+      empty to allow cloud provider to assign an IP address
+    Type: String
+  bigIpExternalServiceIps:
+    Default: 10.0.0.101
+    Description: A private IP address to apply to the external (2/3 nic) or management
+      (1 nic) network interface as a secondary private address. **NOTE:** This address
+      will be applied to the network interface **only** when a value is provided for
+      the bigIpExternalSelfIp (2/3 nic) or bigIpMgmtAddress (1 nic) parameter.
+    Type: String
+  bigIpExternalSubnetId:
+    ConstraintDescription: Must be a valid subnet id
+    Default: ''
+    Description: Subnet id used for BIGIP external interface (required for 2 NIC deployments)
+    Type: String
+  bigIpInternalSelfIp:
+    AllowedPattern: '^$|^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$'
+    Default: 10.0.2.11
+    Description: Internal Private IP Address for BIGIP instance. The address must
+      reside in the subnet provided in the bigIpInternalSubnetId parameter. Leave
+      empty to allow cloud provider to assign an IP address
+    Type: String
+  bigIpInternalSubnetId:
+    ConstraintDescription: Must be a valid subnet id
+    Default: ''
+    Description: Subnet id used for BIGIP internal interface (required for 3 NIC deployments)
+    Type: String
+  bigIpMgmtAddress:
+    AllowedPattern: '^$|^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$'
+    Default: 10.0.1.11
+    Description: Management Private IP Address for BIGIP instance. The address must
+      reside in the subnet provided in the bigIpMgmtSubnetId parameter. Leave empty
+      to allow cloud provider to assign an IP address
+    Type: String
+  bigIpMgmtSubnetId:
+    ConstraintDescription: Must be a valid subnet id
+    Description: Subnet id used for BIGIP management interface
+    Type: AWS::EC2::Subnet::Id
+  bigIpHostname:
+    ConstraintDescription: Must be a valid hostname containing fewer than 63 characters.
+    Default: 'bigip01.local'
+    Description: Supply the hostname you would like to use for the BIG-IP instance.
+      The hostname must contain fewer than 63 characters.
+    MaxLength: 63
+    Type: String
+  bigIpLicenseKey:
+    Default: ''
+    Description: Supply the F5 BYOL license key for the BIG-IP instance. Leave this
+      parameter blank if deploying the PAYG solution.
+    Type: String
+  bigIpRuntimeInitConfig:
+    Default: 'https://f5-cft-v2.s3.amazonaws.com/f5-aws-cloudformation-v2/v3.4.0.0/examples/quickstart/bigip-configurations/runtime-init-conf-3nic-payg.yaml'
+    Description: 'Supply a URL to the bigip-runtime-init configuration file in YAML
+      or JSON format to use for f5-bigip-runtime-init configuration.'
+    Type: String
+  bigIpRuntimeInitPackageUrl:
+    Default: 'https://cdn.f5.com/product/cloudsolutions/f5-bigip-runtime-init/v2.0.1/dist/f5-bigip-runtime-init-2.0.1-1.gz.run'
+    Description: URL for BIG-IP Runtime Init package.
+    Type: String
+  bigIpSecretArn:
+    Default: ''
+    Description: The ARN of an existing AWS Secrets Manager secret where the BIG-IP
+      password used for clustering is stored. If left empty, and provisionSecret is
+      true, a secret will be created.
+    Type: String
+  cost:
+    Default: f5costcenter
+    Description: Cost Center Tag.
+    Type: String
+  bigIpCustomImageId:
+    Default: ''
+    Description: Provide BIG-IP AMI ID you wish to deploy.
+    MaxLength: 255
+    Type: String
+  environment:
+    Default: f5env
+    Description: Environment Tag.
+    Type: String
+  group:
+    Default: f5group
+    Description: Group Tag.
+    Type: String
+  bigIpImage:
+    AllowedValues:
+      - Best
+    ConstraintDescription: Must be a valid F5 BIG-IP VE image type
+    Default: Best
+    Description: F5 BIG-IP Performance Type
+    Type: String
+  bigIpInstanceProfile:
+    Default: ''
+    Description: Enter the name of an existing IAM instance profile with applied IAM
+      policy to be associated to the BIG-IP virtual machine(s). Leave default if not
+      using an instance profile.
+    Type: String
+  bigIpInstanceType:
+    ConstraintDescription: Must be a valid EC2 instance type for BIG-IP
+    Default: m5.2xlarge
+    Description: Enter valid instance type.
+    Type: String
+  licenseType:
+    AllowedValues:
+      - payg
+      - byol
+    Default: payg
+    Description: Specifies license type used for BIG-IP VE.
+    Type: String
+  networkBorderGroup:
+    Default: ''
+    Description: Supply the name of the AWS Network Border Group for the [AWS Local
+      Zone](https://aws.amazon.com/about-aws/global-infrastructure/localzones) where
+      the BIG-IP subnets are located. ex. 'us-east-1-bos'.
+    Type: String
+  numNics:
+    AllowedValues:
+      - 1
+      - 2
+      - 3
+    Default: 3
+    Description: Number of interfaces to create on BIG-IP instance. Maximum of 3 allowed.
+      Minimum of 1 allowed.
+    Type: Number
+  numExternalPublicIpAddresses:
+    Default: 2
+    Description: Total number of external Public IP addresses to create (for the Self-IP
+      and virtual services) on the external (2/3 NIC) or Management interface (1 NIC).
+    MaxValue: 5
+    MinValue: 0
+    Type: Number
+  numSecondaryPrivateIpAddresses:
+    Default: 1
+    Description: The number of secondary private IP addresses to associate to the
+      external (2/3 nic) or management (1 nic) network interface. Dynamic IP addresses
+      will be created only when the externalSelfIp (2/3 nic) or mgmtAddress (1 nic)
+      parameter is left blank. If providing a value for bigIpExternalServiceIps, this
+      number must match the number of IP addresses.
+    MinValue: 0
+    Type: Number
+  owner:
+    Default: f5owner
+    Description: Owner Tag.
+    Type: String
+  provisionPublicIp:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'true'
+    Description: Whether or not to provision Public IP Addresses for the BIG-IP Network
+      Interfaces.
+    Type: String
+  provisionSecret:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'false'
+    Description: Value of true creates AWS Secrets Manager secret.
+    Type: String
+  restrictedSrcAddressApp:
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+    Description: REQUIRED - The IP address range that can be used to access web traffic
+      (80/443) to the EC2 instances.
+    MaxLength: '18'
+    MinLength: '9'
+    Type: String
+  restrictedSrcAddressMgmt:
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+    Description: REQUIRED - The IP address range used to SSH and access BIG-IP management
+      port.  Restrict to your client IP. Ex. X.X.X.X/32. WARNING - For eval purposes
+      only. Production should never have Management interface exposed to Internet.
+    MaxLength: '18'
+    MinLength: '9'
+    Type: String
+  s3BucketName:
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    ConstraintDescription: 'S3 bucket name can include numbers, lowercase letters,
+      uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-).'
+    Description: 'REQUIRED - S3 bucket name for the modules. S3 bucket name can include
+      numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start
+      or end with a hyphen (-).'
+    Default: f5-cft-v2
+    Type: String
+  s3BucketRegion:
+    Default: us-east-1
+    Description: 'The AWS Region where the Quick Start S3 bucket (s3BucketName) is
+      hosted. When using your own bucket, you must specify this value.'
+    Type: String
+  sshKey:
+    Default: ''
+    Description: Supply the public key that will be used for SSH authentication to
+      the BIG-IP, application, and bastion virtual machines. If left empty, one will
+      be created.
+    Type: String
+  throughput:
+    AllowedValues:
+      - 25Mbps
+      - 200Mbps
+      - 1000Mbps
+      - 5000Mbps
+      - 10000Mbps
+    ConstraintDescription: Select the BIG-IP throughput you want to use
+    Default: 25Mbps
+    Description: Maximum amount of throughput for BIG-IP VE.
+    Type: String
+  uniqueString:
+    AllowedPattern: '^[a-z][a-z0-9]{1,11}$'
+    ConstraintDescription: Must contain between 1 and 12 lowercase alphanumeric characters
+      with first character as a letter.
+    Default: myuniqstr
+    Description: Unique String used when creating object names or Tags.
+    Type: String
+  version:
+    AllowedValues:
+      - 17-1-1-026
+      - 16-1-4-1-0535
+    Default: 17-1-1-026
+    Description: Select version of BIG-IP you wish to deploy.
+    Type: String
+  vpcCidr:
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$'
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.0.0.0/16
+    Description: CIDR block for the VPC.
+    Type: String
+  vpcId:
+    Description: Id for VPC to use with deployment
+    ConstraintDescription: Must be valid VPC ID
+    Type: AWS::EC2::VPC::Id
+Resources:
+  Access:
+    Type: 'AWS::CloudFormation::Stack'
+    Condition: useAccess
+    Properties:
+      TemplateURL: !Sub
+        - 'https://${S3Bucket}.s3.${S3Region}.amazonaws.com/${artifactLocation}modules/access/access.yaml'
+        - S3Region: !Ref 's3BucketRegion'
+          S3Bucket: !Ref 's3BucketName'
+      Parameters:
+        createBigIpRoles: !If [useSecret, 'true', 'false']
+        createSecret: !If [createSecret, 'true', 'false']
+        createSshKey: !If [createKeyPair, 'true', 'false']
+        secretArn: !If [useSecretArn, !Ref 'bigIpSecretArn', !Ref 'AWS::NoValue']
+        solutionType: !If [useSecret, 'secret', 'standard']
+        uniqueString: !Ref 'uniqueString'
+        application: !Ref 'application'
+        cost: !Ref 'cost'
+        environment: !Ref 'environment'
+        group: !Ref 'group'
+        owner: !Ref 'owner'
+  BigipStandalone:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub
+        - 'https://${S3Bucket}.s3.${S3Region}.amazonaws.com/${artifactLocation}modules/bigip-standalone/bigip-standalone.yaml'
+        - S3Region: !Ref 's3BucketRegion'
+          S3Bucket: !Ref 's3BucketName'
+      Parameters:
+        allowUsageAnalytics: !Ref 'allowUsageAnalytics'
+        bigIpRuntimeInitPackageUrl: !Ref 'bigIpRuntimeInitPackageUrl'
+        bigIpRuntimeInitConfig: !Ref 'bigIpRuntimeInitConfig'
+        externalSelfPublicIpId: !If [1nicPrivate, !Ref 'AWS::NoValue', !GetAtt [Dag,
+            Outputs.bigIpExternalEipAllocationId01]]
+        externalServicePublicIpIds: !If [1nicPrivate, !Ref 'AWS::NoValue', !GetAtt [
+            Dag, Outputs.bigIpVipAllocationIds]]
+        externalSecurityGroupId: !If [2nic, !GetAtt [Dag, Outputs.bigIpExternalSecurityGroup],
+          !Ref 'AWS::NoValue']
+        externalSelfIp: !If [2nic, !Ref 'bigIpExternalSelfIp', !Ref 'AWS::NoValue']
+        externalServiceIps: !Ref 'bigIpExternalServiceIps'
+        externalSubnetId: !If [2nic, !Ref 'bigIpExternalSubnetId', !Ref 'AWS::NoValue']
+        hostname: !Ref 'bigIpHostname'
+        imageId: !If [noCustomImageId, !If [isPaygLicensing, !FindInMap [!FindInMap [
+                VERSION, !Ref 'version', REGIONMAP], !Ref 'AWS::Region', !FindInMap [
+                AWSBigipThroughput, !Ref 'throughput', !Ref 'bigIpImage']], !FindInMap [
+              !FindInMap [VERSION, !Ref 'version', REGIONMAP], !Ref 'AWS::Region',
+              AllTwoBootLocations]], !Ref 'bigIpCustomImageId']
+        instanceProfile: !If [useBigIpInstanceProfile, !Ref 'bigIpInstanceProfile',
+          !If [useSecret, !GetAtt [Access, Outputs.bigIpInstanceProfile], !Ref 'AWS::NoValue']]
+        instanceType: !Ref 'bigIpInstanceType'
+        internalSecurityGroupId: !If [3nic, !GetAtt [Dag, Outputs.bigIpInternalSecurityGroup],
+          !Ref 'AWS::NoValue']
+        internalSelfIp: !If [3nic, !Ref 'bigIpInternalSelfIp', !Ref 'AWS::NoValue']
+        internalSubnetId: !If [3nic, !Ref 'bigIpInternalSubnetId', !Ref 'AWS::NoValue']
+        licenseKey: !Ref 'bigIpLicenseKey'
+        mgmtPublicIpId: !If [noPublicIp, !Ref 'AWS::NoValue', !GetAtt [Dag, Outputs.bigIpManagementEipAllocationId01]]
+        mgmtSecurityGroupId: !GetAtt [Dag, Outputs.bigIpMgmtSecurityGroup]
+        mgmtAddress: !Ref 'bigIpMgmtAddress'
+        mgmtSubnetId: !Ref 'bigIpMgmtSubnetId'
+        numExternalPublicIpAddresses: !If [1nicPrivate, 0, !Ref 'numExternalPublicIpAddresses']
+        numSecondaryPrivateIpAddresses: !Ref 'numSecondaryPrivateIpAddresses'
+        secretArn: !If [useSecret, !If [createSecret, !GetAtt [Access, Outputs.secretArn],
+            !Ref 'bigIpSecretArn'], !Ref 'AWS::NoValue']
+        sshKey: !If [createKeyPair, !GetAtt [Access, Outputs.keyPairName], !Ref 'sshKey']
+        uniqueString: !Ref 'uniqueString'
+        application: !Ref 'application'
+        cost: !Ref 'cost'
+        environment: !Ref 'environment'
+        group: !Ref 'group'
+        owner: !Ref 'owner'
+  Dag:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub
+        - 'https://${S3Bucket}.s3.${S3Region}.amazonaws.com/${artifactLocation}modules/dag/dag.yaml'
+        - S3Region: !Ref 's3BucketRegion'
+          S3Bucket: !Ref 's3BucketName'
+      Parameters:
+        createAppSecurityGroup: 'true'
+        createBastionSecurityGroup: !If [noPublicIp, 'true', 'false']
+        createExternalSecurityGroup: !If [2nic, 'true', 'false']
+        createInternalSecurityGroup: !If [3nic, 'true', 'false']
+        networkBorderGroup: !Ref 'networkBorderGroup'
+        numberPublicExternalIpAddresses: !If [1nicPrivate, 0, !Ref 'numExternalPublicIpAddresses']
+        numberPublicMgmtIpAddresses: !If [noPublicIp, 0, 1]
+        restrictedSrcAddressApp: !Ref 'restrictedSrcAddressApp'
+        restrictedSrcAddressMgmt: !Ref 'restrictedSrcAddressMgmt'
+        restrictedSrcPort: !If [1nic, 8443, 443]
+        uniqueString: !Ref 'uniqueString'
+        vpcCidr: !Ref 'vpcCidr'
+        vpc: !Ref 'vpcId'
+        application: !Ref 'application'
+        cost: !Ref 'cost'
+        environment: !Ref 'environment'
+        group: !Ref 'group'
+        owner: !Ref 'owner'

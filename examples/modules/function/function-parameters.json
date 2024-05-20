@@ -1,0 +1,74 @@
+[
+  {
+    "ParameterKey": "amiLookupRole",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "application",
+    "ParameterValue": "f5app"
+  },
+  {
+    "ParameterKey": "bigIpRuntimeInitConfig",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "bigIqAddressType",
+    "ParameterValue": "private"
+  },
+  {
+    "ParameterKey": "bigIqSecretArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "bigIqSecurityGroupId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "bigIqSubnetId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "copyZipsRole",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "cost",
+    "ParameterValue": "f5cost"
+  },
+  {
+    "ParameterKey": "createAmiLookupFunction",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "createRevokeFunction",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "environment",
+    "ParameterValue": "f5env"
+  },
+  {
+    "ParameterKey": "group",
+    "ParameterValue": "f5group"
+  },
+  {
+    "ParameterKey": "lambdaAccessRole",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "lambdaS3BucketName",
+    "ParameterValue": "f5-aws-bigiq-revoke"
+  },
+  {
+    "ParameterKey": "lambdaS3Key",
+    "ParameterValue": "main/"
+  },
+  {
+    "ParameterKey": "owner",
+    "ParameterValue": "f5owner"
+  },
+  {
+    "ParameterKey": "uniqueString",
+    "ParameterValue": "myuniqstr"
+  }
+]
